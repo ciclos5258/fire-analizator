@@ -4,6 +4,8 @@
 
 Команда **Две калеки** · Красноярск, 18–20 сентября 2026.
 
+Отчет (pdf): https://drive.google.com/file/d/1xh-tbR4V961XaHtDlfDT3O_AFZLWkJ3P/view?usp=sharing
+
 ## Результат
 
 | Метрика               | Значение   |
