@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import argparse
 import csv
+import sys
 from pathlib import Path
 
 import numpy as np
 
-import sys
+csv.field_size_limit(sys.maxsize)
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rle import rle_decode  # noqa: E402
+
 
 
 def validate(sub_path: Path, sample_path: Path | None = None) -> None:

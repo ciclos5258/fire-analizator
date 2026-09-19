@@ -1,6 +1,7 @@
 """MVP inference: AF по пороговому правилу, BS — пустой (заглушка)."""
 
 from __future__ import annotations
+from bs_baseline import predict_bs_chip
 
 import argparse
 import sys
@@ -22,6 +23,20 @@ AF_D45_MIN = 25.0
 BAND_I4 = 4
 BAND_I5 = 5
 
+def find_bs_files(data_dir: Path, chip_id: str):
+    """Ищет S2 pre, S2 post, aux."""
+    candidates = [
+        (data_dir / "bs" / "sentinel2_pre"  / f"{chip_id}_Sentinel-2_pre.tif",
+         data_dir / "bs" / "sentinel2_post" / f"{chip_id}_Sentinel-2_post.tif",
+         data_dir / "bs" / "aux"            / f"{chip_id}_AUX.tif"),
+        (data_dir / "bs" / "pre"  / f"{chip_id}_Sentinel-2_pre.tif",
+         data_dir / "bs" / "post" / f"{chip_id}_Sentinel-2_post.tif",
+         data_dir / "bs" / "aux"  / f"{chip_id}_AUX.tif"),
+    ]
+    for pre, post, aux in candidates:
+        if pre.exists() and post.exists() and aux.exists():
+            return pre, post, aux
+    return None
 
 def predict_af(viirs_path: Path) -> np.ndarray:
     """Возвращает бинарную маску (H, W) uint8 для AF-чипа.
@@ -108,8 +123,10 @@ def main() -> int:
     n_bs = sum(1 for c in unique_chips if str(c).startswith("BS_"))
     print(f"  AF-чипов: {n_af}, BS-чипов: {n_bs}")
 
-    # Кеш: для AF мы обрабатываем чип один раз, но строк в df у него одна
     af_cache: dict[str, str] = {}
+    bs_cache: dict[str, np.ndarray] = {}
+    n_af_processed = n_af_notfound = 0
+    n_bs_processed = n_bs_notfound = n_bs_failed = 0
 
     rows_out = []
     n_af_processed = 0
@@ -140,11 +157,23 @@ def main() -> int:
             rows_out.append({"chip_id": cid, "class_id": 1, "rle": rle})
 
         elif cid.startswith("BS_"):
-            # Заглушка: пустой RLE для всех трёх классов
-            rows_out.append({"chip_id": cid, "class_id": cid_class, "rle": ""})
+            if cid not in bs_cache:
+                files = find_bs_files(data_dir, cid)
+                if files is None:
+                    bs_cache[cid] = np.zeros((512, 512), dtype=np.uint8)
+                    n_bs_notfound += 1
+                else:
+                    try:
+                        bs_cache[cid] = predict_bs_chip(*files)
+                        n_bs_processed += 1
+                    except Exception as e:
+                        print(f"  ⚠️  {cid}: {e}")
+                        bs_cache[cid] = np.zeros((512, 512), dtype=np.uint8)
+                        n_bs_failed += 1
 
-        else:
-            raise ValueError(f"Неизвестный chip_id: {cid}")
+            mask = bs_cache[cid]
+            rle = rle_encode((mask == cid_class).astype(np.uint8))
+            rows_out.append({"chip_id": cid, "class_id": cid_class, "rle": rle})
 
     # Запись в формате из постановки: кавычки только вокруг rle
     with open(output, "w", encoding="utf-8", newline="") as f:
@@ -154,6 +183,9 @@ def main() -> int:
 
     print(f"\nAF обработано:       {n_af_processed}")
     print(f"AF не найдено файла: {n_af_notfound}")
+    print(f"BS обработано:       {n_bs_processed}")
+    print(f"BS не найдено файла: {n_bs_notfound}")
+    print(f"BS ошибок:           {n_bs_failed}")
     print(f"Строк всего:         {len(rows_out)} (ожидается {len(df)})")
     print(f"✅ Submission записан: {output}")
 
