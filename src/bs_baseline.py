@@ -75,3 +75,21 @@ def predict_bs_chip(s2_pre: Path, s2_post: Path, aux: Path) -> np.ndarray:
     dnbr, valid = compute_dnbr(pre, post)
     landcover = read_landcover(aux)
     return classify_dnbr(dnbr, valid, landcover)
+
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from bs_postprocess import postprocess_bs_mask
+
+def predict_bs_chip_post(
+    s2_pre: Path,
+    s2_post: Path,
+    aux: Path,
+    use_postprocess: bool = True,
+) -> np.ndarray:
+    """Как predict_bs_chip, но с постобработкой."""
+    mask = predict_bs_chip(s2_pre, s2_post, aux)
+    if use_postprocess:
+        mask = postprocess_bs_mask(mask)
+    return mask

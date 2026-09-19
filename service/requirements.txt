@@ -1,0 +1,16 @@
+# --- UI ---
+streamlit>=1.40
+plotly>=5.24
+pandas>=2.2
+
+# --- Геообработка ---
+shapely>=2.0
+# geopandas>=1.0   # опционально: для анализа AOI-файлов, не требуется для app.py
+
+# --- HTTP-клиент к FastAPI ---
+requests>=2.32
+
+# --- REST API ---
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
