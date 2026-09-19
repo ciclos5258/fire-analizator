@@ -21,58 +21,64 @@ DATA_DIR = BASE_DIR / "data"
 API_URL = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
 API_TIMEOUT = 60
 
-DATA_MODE = os.getenv("DATA_MODE", "remote").lower().strip()
-if DATA_MODE not in ("local", "remote", "auto"):
-    DATA_MODE = "auto"
+DATA_MODE = "local"
 
 DEMO_DATA_VERSION = 2
 
+# ---------------------------------------------------------------------------
+# Единственный источник правды для цветов.
+# Каждый ключ автоматически превращается в CSS-переменную:
+#   "bg_panel" -> var(--bg-panel)
+# Поэтому палитру достаточно поменять один раз, здесь.
+# ---------------------------------------------------------------------------
 THEME = {
-    "bg": "#0b1a2e",
-    "bg_app": "#102643",
-    "bg_panel": "#1a3a5c",
-    "bg_sidebar": "#081524",
-    "bg_input": "#0d2035",
-    "accent": "#7588FD",
-    "accent_hover": "#9aa8ff",
-    "accent_deep": "#4a5ee0",
-    "text": "#FFFFFF",
-    "text_soft": "#b0c4de",
-    "text_mute": "#7a8fa6",
-    "border": "rgba(117, 136, 253, 0.30)",
-    "border_soft": "rgba(117, 136, 253, 0.15)",
-    "border_strong": "rgba(117, 136, 253, 0.55)",
-    "thermopoint": "#ff4d4d",
-    "blink_point": "#FFD700",
-    "panel": "rgba(26, 58, 92, 0.55)",
-    "shadow": "0 8px 32px rgba(0, 0, 0, 0.35)",
+    # поверхности
+    "bg_app": "#2b3846",
+    "bg_sidebar": "#17212b",
+    "bg_panel": "#000000",
+    "bg_muted": "#00000076",
+    "bg_input": "#ffffff",
+    # акцент (используется редко: кнопка, ссылки, фокус, рамка запроса)
+    "accent": "#1f5fa8",
+    "accent_hover": "#184c87",
+    # текст
+    "text": "#ffffff",
+    "text_soft": "#fcfcfce8",
+    "text_mute": "#66727f",
+    # линии
+    "border": "#d3dae2",
+    "border_soft": "#e4e8ed",
+    "border_strong": "#a9b4c0",
+    # статусы
+    "ok": "#2b7a4b",
+    "warn": "#b06f00",
+    # данные на карте
+    "thermopoint": "#d92d20",
+    "blink_point": "#0b1f3a",
 }
 
 SEVERITY_META: dict[int, dict[str, str]] = {
     1: {
         "name": "Слабая",
-        "fill": "rgba(255, 224, 138, 0.55)",
-        "border": "#f59e0b",
-        "emoji": "🟢",
+        "fill": "rgba(245, 200, 76, 0.45)",
+        "border": "#c99a12",
     },
     2: {
         "name": "Средняя",
-        "fill": "rgba(245, 158, 58, 0.60)",
-        "border": "#ea580c",
-        "emoji": "🟡",
+        "fill": "rgba(240, 138, 43, 0.45)",
+        "border": "#c4590a",
     },
     3: {
         "name": "Сильная",
-        "fill": "rgba(220, 38, 38, 0.65)",
-        "border": "#991b1b",
-        "emoji": "🔴",
+        "fill": "rgba(211, 47, 47, 0.50)",
+        "border": "#8f1d1d",
     },
 }
 
 SEVERITY_LEGEND_COLORS = {
-    1: "#ffe08a",
-    2: "#f59e3a",
-    3: "#dc2626",
+    1: "#f5c84c",
+    2: "#f08a2b",
+    3: "#d32f2f",
 }
 
 SOURCE_LABELS = {
@@ -139,427 +145,512 @@ def _zoom_from_bbox(bbox: list[float] | None) -> float:
     return max(1.0, min(16.0, zoom))
 
 
+# ---------------------------------------------------------------------------
+# Стили
+# ---------------------------------------------------------------------------
+
+# @import обязан стоять в самом начале таблицы стилей, иначе браузер его игнорирует.
+_FONT_IMPORT = (
+    "@import url('https://fonts.googleapis.com/css2"
+    "?family=IBM+Plex+Sans:wght@400;500;600"
+    "&family=IBM+Plex+Mono:wght@400;500&display=swap');"
+)
+
+# Палитра из THEME превращается в блок  :root { --bg-app: #f3f5f8; ... }
+_ROOT_VARS = "\n".join(
+    f"    --{key.replace('_', '-')}: {value};" for key, value in THEME.items()
+)
+
+_CSS = """
+:root {
+    --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont,
+                 'Segoe UI', Roboto, Arial, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo,
+                 Consolas, monospace;
+    --radius: 3px;
+}
+
+/* ---------- Основа ---------- */
+
+html, body, .stApp {
+    background: var(--bg-app);
+    color: var(--text);
+}
+
+.stApp,
+.stApp :is(p, li, label, h1, h2, h3, h4, h5, h6,
+           input, textarea, button, td, th, small) {
+    font-family: var(--font-sans) !important;
+}
+
+/* Иконки Streamlit — это шрифт, его нельзя подменять нашим */
+.stApp [data-testid="stIconMaterial"],
+.stApp .material-symbols-rounded,
+.stApp .material-icons {
+    font-family: 'Material Symbols Rounded', 'Material Icons' !important;
+}
+
+[data-testid="stHeader"] { background: transparent; }
+
+.block-container {
+    max-width: 1440px;
+    padding-top: 2.5rem;
+    padding-bottom: 3rem;
+}
+
+/* ---------- Типографика ---------- */
+
+.stApp p, .stApp li, .stApp label {
+    color: var(--text-soft);
+    line-height: 1.55;
+}
+
+.stApp strong { color: var(--text); font-weight: 600; }
+.stApp a { color: var(--accent); }
+
+.stApp [data-testid="stCaptionContainer"],
+.stApp [data-testid="stCaptionContainer"] p,
+.stApp small {
+    color: var(--text-mute) !important;
+    font-size: 1rem;
+}
+
+.stApp [data-testid="stWidgetLabel"] p {
+    color: var(--text);
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.stApp h1, .stApp h2, .stApp h3, .stApp h4 {
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0;
+}
+
+.stApp h1 { font-size: 1.6rem; margin: 0 0 0.75rem; padding: 0; }
+
+.stApp h2 {
+    font-size: 1.2rem;
+    margin: 2.25rem 0 1rem;
+    padding: 0 0 0.6rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.stApp h3 { font-size: 1rem; margin: 1.5rem 0 0.6rem; padding: 0; }
+.stApp h4 { font-size: 0.95rem; margin: 1rem 0 0.4rem; padding: 0; }
+
+/* Якорные ссылки рядом с заголовками */
+.stApp [data-testid="stHeaderActionElements"],
+.stApp h1 > a, .stApp h2 > a, .stApp h3 > a, .stApp h4 > a {
+    display: none !important;
+}
+
+.stApp hr, [data-testid="stSidebar"] hr {
+    border: none;
+    border-top: 1px solid var(--border-soft);
+    margin: 1.25rem 0;
+}
+
+/* ---------- Шапка страницы ---------- */
+
+.stApp .header {
+    margin: 0 0 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.stApp .header h1 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+    padding: 0;
+    color: var(--text);
+}
+
+.stApp .header p {
+    margin: 0;
+    color: var(--text-mute);
+    font-size: 0.95rem;
+}
+
+/* ---------- Метки ---------- */
+
+.stApp .badge-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 0 24px;
+}
+
+.stApp .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: var(--bg-panel);
+    color: var(--text-soft);
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+/* Цветная точка слева — это статус, а не украшение */
+.stApp .badge::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border-strong);
+}
+.stApp .badge-ok::before   { background: var(--ok); }
+.stApp .badge-warn::before { background: var(--warn); }
+
+/* ---------- Показатели ---------- */
+
+.stApp .metric {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px 18px;
+}
+
+.stApp .metric-title {
+    color: var(--text-mute);
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.stApp .metric-value {
+    color: var(--text);
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Степени поражения ---------- */
+
+.stApp .severity {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+}
+
+.stApp .severity-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.stApp .severity .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex: 0 0 10px;
+}
+
+.stApp .severity-name {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-soft);
+}
+
+.stApp .severity-name::first-letter { text-transform: uppercase; }
+
+.stApp .severity-area {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Полоса показывает долю площади от общей */
+.stApp .severity-bar {
+    height: 4px;
+    background: var(--bg-muted);
+    margin: 12px 0 8px;
+}
+
+.stApp .severity-bar > span { display: block; height: 100%; }
+
+.stApp .severity-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.82rem;
+    color: var(--text-mute);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Информационный блок ---------- */
+
+.stApp .info-box {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 20px;
+    color: var(--text-soft);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.stApp .info-title {
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.stApp .info-box b { color: var(--text); font-weight: 600; }
+
+.stApp .info-box code {
+    background: var(--bg-muted);
+    border: 1px solid var(--border-soft);
+    color: var(--text);
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-family: var(--font-mono) !important;
+    font-size: 0.85em;
+}
+
+/* Строки «параметр — значение» */
+.stApp .kv {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 16px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border-soft);
+}
+
+.stApp .kv:last-child { padding-bottom: 0; }
+.stApp .kv .k { color: var(--text-mute); }
+.stApp .kv .v { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ---------- Легенда карты ---------- */
+
+.stApp .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 8px 32px;
+    margin-top: 12px;
+}
+
+.stApp .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-soft);
+    font-size: 0.88rem;
+}
+
+.stApp .legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 10px;
+}
+
+/* Прямоугольник — для площадных объектов (контуры гарей) */
+.stApp .legend-area {
+    display: inline-block;
+    width: 18px;
+    height: 10px;
+    border-radius: 2px;
+    flex: 0 0 18px;
+}
+
+/* Рамка — для границы области запроса */
+.stApp .legend-frame {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 18px;
+    height: 10px;
+    border: 2px solid var(--accent);
+    border-radius: 2px;
+    flex: 0 0 18px;
+}
+
+/* ---------- Подвал ---------- */
+
+.stApp .footer-note {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 28px;
+    margin-top: 32px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    color: var(--text-mute);
+    font-size: 0.82rem;
+}
+
+.stApp .footer-note code {
+    font-family: var(--font-mono) !important;
+    font-size: 0.95em;
+    color: var(--text-soft);
+}
+
+/* ---------- Боковая панель ---------- */
+
+[data-testid="stSidebar"] {
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+}
+
+[data-testid="stSidebar"] h1 {
+    font-size: 1.15rem;
+    margin: 0 0 0.25rem;
+    padding: 0;
+    border: none;
+}
+
+[data-testid="stSidebar"] h3 {
+    font-size: 0.95rem;
+    margin: 0.25rem 0 0.5rem;
+}
+
+/* ---------- Поля ввода ---------- */
+
+[data-baseweb="input"],
+[data-baseweb="textarea"],
+[data-baseweb="select"] > div {
+    background-color: var(--bg-input) !important;
+    border: 1px solid var(--border-strong) !important;
+    border-radius: var(--radius) !important;
+}
+
+/* Вложенный слой не должен рисовать вторую рамку */
+[data-baseweb="base-input"] {
+    background: transparent !important;
+    border: none !important;
+}
+
+[data-baseweb="input"] input,
+[data-baseweb="base-input"] input,
+[data-baseweb="textarea"] textarea {
+    color: var(--text) !important;
+    -webkit-text-fill-color: var(--text) !important;
+    background: transparent !important;
+}
+
+[data-baseweb="input"]:focus-within,
+[data-baseweb="textarea"]:focus-within,
+[data-baseweb="select"] > div:focus-within {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 1px var(--accent) !important;
+}
+
+[data-testid="stNumberInput"] input { font-variant-numeric: tabular-nums; }
+
+[data-testid="stNumberInputStepUp"],
+[data-testid="stNumberInputStepDown"] {
+    background: var(--bg-muted);
+    color: var(--text-soft);
+}
+
+/* GeoJSON — это код, поэтому моноширинный шрифт уместен */
+[data-testid="stTextArea"] textarea {
+    font-family: var(--font-mono) !important;
+    font-size: 0.8rem;
+}
+
+[data-baseweb="calendar"] {
+    background-color: var(--bg-panel) !important;
+    color: var(--text) !important;
+}
+
+/* ---------- Кнопки ---------- */
+
+.stButton button,
+.stDownloadButton button {
+    border-radius: var(--radius);
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    box-shadow: none !important;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+/* Главное действие — заливка */
+.stButton button {
+    background: var(--accent);
+    border: 1px solid var(--accent) !important;
+    color: #ffffff !important;
+}
+
+.stButton button:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover) !important;
+}
+
+.stButton button:disabled {
+    background: var(--bg-muted);
+    border-color: var(--border) !important;
+    color: var(--text-mute) !important;
+    cursor: not-allowed;
+}
+
+/* Скачивание — второстепенное действие, поэтому только контур */
+.stDownloadButton button {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-strong) !important;
+    color: var(--text) !important;
+}
+
+.stDownloadButton button:hover {
+    background: var(--bg-panel);
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+/* Текст внутри кнопки лежит в <p>, а у него свой цвет */
+.stButton button p,
+.stDownloadButton button p { color: inherit !important; }
+
+.stButton button:focus-visible,
+.stDownloadButton button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ---------- Уведомления, таблица, карта ---------- */
+
+[data-testid="stAlert"] { border-radius: var(--radius); }
+
+[data-testid="stDataFrame"],
+[data-testid="stPlotlyChart"] {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+/* ---------- Прочее ---------- */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-app); }
+::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 6px;
+    border: 2px solid var(--bg-app);
+}
+
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+"""
+
 st.markdown(
-    textwrap.dedent("""
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-        :root {
-            --bg-app:        #0b1a2e;
-            --bg-app-2:      #102643;
-            --bg-panel:      #1a3a5c;
-            --bg-sidebar:    #081524;
-            --bg-input:      #0d2035;
-
-            --border-soft:   rgba(117, 136, 253, 0.15);
-            --border:        rgba(117, 136, 253, 0.30);
-            --border-strong: rgba(117, 136, 253, 0.55);
-
-            --accent:        #7588FD;
-            --accent-hover:  #9aa8ff;
-            --accent-deep:   #4a5ee0;
-
-            --text:          #FFFFFF;
-            --text-soft:     #b0c4de;
-            --text-mute:     #7a8fa6;
-
-            --shadow-blue:   0 8px 32px rgba(0, 0, 0, 0.35);
-            --shadow-accent: 0 4px 16px rgba(117, 136, 253, 0.30);
-        }
-
-        html, body, .stApp, [class*="css"] {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont,
-                         'Segoe UI', Roboto, sans-serif;
-        }
-
-        html, body, .stApp {
-            background: var(--bg-app);
-            color: var(--text);
-        }
-
-        .stApp {
-            background:
-                radial-gradient(1200px 600px at 15% -10%,
-                                rgba(117, 136, 253, 0.10), transparent 60%),
-                radial-gradient(900px 500px at 100% 0%,
-                                rgba(74, 94, 224, 0.08), transparent 55%),
-                linear-gradient(180deg, #081524 0%, #102643 100%);
-        }
-
-        [data-testid="stHeader"] { background: transparent; }
-
-        .block-container {
-            max-width: 1500px;
-            padding-top: 2rem;
-            padding-bottom: 3rem;
-        }
-
-        .stApp h1, .stApp h2, .stApp h3, .stApp h4,
-        .stApp h5, .stApp h6 {
-            color: #FFFFFF;
-            font-weight: 700;
-            letter-spacing: -0.3px;
-            line-height: 1.25;
-        }
-
-        .stApp h1 { font-size: 2.2rem; font-weight: 800; margin: 0 0 0.75rem; }
-        .stApp h2 {
-            font-size: 1.4rem;
-            color: var(--accent);
-            border-bottom: 2px solid rgba(117, 136, 253, 0.30);
-            padding-bottom: 8px;
-            margin: 1.8rem 0 0.8rem;
-        }
-        .stApp h3 { font-size: 1.15rem; margin: 1.2rem 0 0.5rem; color: #FFFFFF; }
-        .stApp h4 { font-size: 1rem; margin: 0.9rem 0 0.4rem; color: var(--text-soft); }
-
-        .stApp h1 > a, .stApp h2 > a,
-        .stApp h3 > a, .stApp h4 > a {
-            display: none !important;
-        }
-
-        .stApp p, .stApp span, .stApp li, .stApp label, .stApp strong {
-            color: var(--text-soft);
-            line-height: 1.55;
-        }
-
-        .stApp a { color: var(--accent); }
-
-        .stApp [data-testid="stCaptionContainer"], .stApp small {
-            color: var(--text-mute) !important;
-        }
-
-        .stApp hr, [data-testid="stSidebar"] hr {
-            border: none;
-            border-top: 1px solid var(--border-soft);
-            margin: 1rem 0;
-        }
-
-        .header { margin-bottom: 20px; }
-
-        .header h1 {
-            font-size: 2.4rem;
-            font-weight: 800;
-            letter-spacing: -0.6px;
-            margin: 0 0 6px;
-            color: #FFFFFF;
-        }
-
-        .header h1::before {
-            content: "";
-            display: inline-block;
-            width: 6px;
-            height: 32px;
-            background: var(--accent);
-            border-radius: 3px;
-            margin-right: 14px;
-            vertical-align: -4px;
-            box-shadow: 0 0 16px rgba(117, 136, 253, 0.7);
-        }
-
-        .header p {
-            color: var(--text-mute);
-            font-size: 1rem;
-            margin: 0 0 0 20px;
-        }
-
-        .badge-row {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin: 6px 0 18px;
-        }
-
-        .badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            border: 1px solid var(--border);
-            background: rgba(117, 136, 253, 0.15);
-            color: var(--accent);
-            line-height: 1.4;
-            white-space: nowrap;
-        }
-
-        .badge-ok {
-            border-color: rgba(117, 136, 253, 0.55);
-            background: rgba(117, 136, 253, 0.22);
-            color: #FFFFFF;
-        }
-
-        .badge-warn {
-            border-color: rgba(255, 200, 100, 0.50);
-            background: rgba(255, 200, 100, 0.10);
-            color: #FFC864;
-        }
-
-        .metric {
-            background: rgba(26, 58, 92, 0.55);
-            backdrop-filter: blur(10px);
-            border: 1px solid var(--border-soft);
-            border-radius: 12px;
-            padding: 20px 24px;
-            min-height: 120px;
-            box-shadow: var(--shadow-blue);
-            transition: all 0.25s ease;
-        }
-
-        .metric:hover {
-            border-color: var(--border-strong);
-            transform: translateY(-2px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-        }
-
-        .metric-title {
-            color: var(--text-mute);
-            font-size: 0.78rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
-            font-weight: 600;
-        }
-
-        .metric-value {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #FFFFFF;
-            line-height: 1.1;
-        }
-
-        .severity {
-            background: rgba(26, 58, 92, 0.45);
-            border: 1px solid var(--border-soft);
-            border-radius: 12px;
-            padding: 24px 20px;
-            text-align: center;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-        }
-
-        .severity.sev-1 { border-left: 4px solid #ffe08a; }
-        .severity.sev-2 { border-left: 4px solid #f59e3a; }
-        .severity.sev-3 { border-left: 4px solid #dc2626; }
-
-        .severity-name {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-soft);
-        }
-
-        .severity-area {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: #FFFFFF;
-        }
-
-        .severity-percent {
-            color: var(--text-mute);
-            font-size: 0.8rem;
-            margin-top: 4px;
-        }
-
-        .info-box {
-            background: rgba(26, 58, 92, 0.40);
-            border: 1px solid var(--border-soft);
-            border-radius: 12px;
-            padding: 20px 24px;
-            color: var(--text-soft);
-            box-shadow: var(--shadow-blue);
-            line-height: 1.8;
-        }
-
-        .info-box b { color: var(--accent); }
-
-        .info-box code {
-            background: rgba(117, 136, 253, 0.15);
-            color: var(--accent);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-
-        .legend-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin: 8px 0;
-            color: var(--text-soft);
-            font-size: 0.9rem;
-        }
-
-        .legend-dot {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            flex: 0 0 14px;
-            border: 2px solid rgba(255, 255, 255, 0.35);
-        }
-
-        .legend-line {
-            display: inline-block;
-            width: 22px;
-            height: 4px;
-            border-radius: 2px;
-            flex: 0 0 22px;
-        }
-
-        .footer-note {
-            margin-top: 30px;
-            padding-top: 14px;
-            border-top: 1px solid var(--border-soft);
-            color: var(--text-mute);
-            font-size: 0.82rem;
-            text-align: center;
-            line-height: 1.6;
-        }
-
-        [data-testid="stSidebar"] {
-            background: var(--bg-sidebar);
-            border-right: 1px solid var(--border-soft);
-            color: var(--text-soft);
-        }
-
-        [data-testid="stSidebar"] .block-container { padding-top: 1.5rem; }
-
-        [data-testid="stSidebar"] h1,
-        [data-testid="stSidebar"] h2,
-        [data-testid="stSidebar"] h3,
-        [data-testid="stSidebar"] h4 {
-            color: #FFFFFF;
-            border: none;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-            color: var(--text-mute) !important;
-        }
-
-        [data-testid="stSidebar"] [data-testid="stRadio"] label,
-        [data-testid="stSidebar"] [data-testid="stCheckbox"] label {
-            color: var(--text-soft) !important;
-        }
-
-        [data-baseweb="input"],
-        [data-baseweb="select"] > div,
-        [data-baseweb="base-input"],
-        [data-baseweb="textarea"] {
-            background-color: var(--bg-input) !important;
-            border-radius: 8px !important;
-            border: 1px solid var(--border) !important;
-            color: var(--text) !important;
-        }
-
-        [data-baseweb="input"] input,
-        [data-baseweb="base-input"] input,
-        [data-baseweb="textarea"] textarea {
-            color: var(--text) !important;
-            background: transparent !important;
-        }
-
-        [data-baseweb="input"]:focus-within,
-        [data-baseweb="select"] > div:focus-within,
-        [data-baseweb="textarea"]:focus-within {
-            border-color: var(--accent) !important;
-            box-shadow: 0 0 0 3px rgba(117, 136, 253, 0.18) !important;
-        }
-
-        [data-baseweb="calendar"] {
-            background-color: var(--bg-panel) !important;
-            color: var(--text) !important;
-        }
-
-        .stButton button,
-        .stDownloadButton button {
-            background: var(--accent);
-            color: #FFFFFF !important;
-            border: none !important;
-            border-radius: 8px;
-            font-weight: 600;
-            padding: 0.55rem 1.2rem;
-            transition: all 0.2s ease;
-            box-shadow: var(--shadow-accent);
-        }
-
-        .stButton button:hover,
-        .stDownloadButton button:hover {
-            background: var(--accent-hover);
-            box-shadow: 0 6px 22px rgba(117, 136, 253, 0.5);
-            transform: translateY(-1px);
-            color: #FFFFFF !important;
-        }
-
-        .stButton button:active,
-        .stDownloadButton button:active {
-            transform: translateY(0);
-        }
-
-        .stButton button:disabled,
-        .stDownloadButton button:disabled {
-            background: rgba(74, 94, 224, 0.30);
-            color: rgba(255, 255, 255, 0.45) !important;
-            box-shadow: none;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .stAlert {
-            background: rgba(117, 136, 253, 0.10) !important;
-            border: 1px solid var(--border) !important;
-            border-radius: 10px;
-            color: var(--text) !important;
-        }
-
-        .stAlert [data-testid="stMarkdownContainer"] p,
-        .stAlert [data-testid="stMarkdownContainer"] span {
-            color: var(--text) !important;
-        }
-
-        [data-testid="stExpander"] {
-            background: rgba(26, 58, 92, 0.40);
-            border: 1px solid var(--border-soft);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        [data-testid="stExpander"] summary {
-            color: var(--accent) !important;
-            font-weight: 600;
-        }
-
-        [data-testid="stDataFrame"] {
-            background: rgba(26, 58, 92, 0.40);
-            border: 1px solid var(--border-soft);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        [data-testid="stPlotlyChart"] {
-            background: rgba(11, 26, 46, 0.75);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 8px;
-            box-shadow: var(--shadow-blue);
-            overflow: hidden;
-        }
-
-        ::-webkit-scrollbar { width: 10px; height: 10px; }
-        ::-webkit-scrollbar-track { background: var(--bg-app); }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(117, 136, 253, 0.35);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(117, 136, 253, 0.6);
-        }
-
-        #MainMenu { visibility: hidden; }
-        footer { visibility: hidden; }
-        </style>
-        """),
+    f"<style>\n{_FONT_IMPORT}\n:root {{\n{_ROOT_VARS}\n}}\n{_CSS}</style>",
     unsafe_allow_html=True,
 )
 
@@ -1135,7 +1226,8 @@ def _hover_html(props: dict, title: str) -> str:
             continue
         safe_key = str(key).replace("<", "&lt;").replace(">", "&gt;")
         safe_val = str(value).replace("<", "&lt;").replace(">", "&gt;")
-        rows.append(f"<b>{safe_key}:</b> {safe_val}")
+        # название поля — приглушённым цветом, значение — основным
+        rows.append(f'<span style="color:{THEME["text_mute"]}">{safe_key}:</span> {safe_val}')
 
     safe_title = str(title).replace("<", "&lt;").replace(">", "&gt;")
     return f"<b>{safe_title}</b><br>" + "<br>".join(rows)
@@ -1304,13 +1396,13 @@ def build_plotly_map(
 
             meta = SEVERITY_META.get(sev)
             if meta is None:
-                fill_color = "rgba(148, 163, 184, 0.40)"
-                border_color = "#64748b"
-                line_width = 3.0
+                fill_color = "rgba(120, 130, 145, 0.30)"
+                border_color = THEME["text_mute"]
+                line_width = 1.5
             else:
                 fill_color = meta["fill"]
                 border_color = meta["border"]
-                line_width = 4.0 if sev == 3 else 3.0
+                line_width = 2.0 if sev == 3 else 1.5
 
             hover = _hover_html(
                 {
@@ -1390,9 +1482,9 @@ def build_plotly_map(
                     legendgroup="thermal-normal",
                     showlegend=False,
                     marker=dict(
-                        size=12,
+                        size=9,
                         color=THEME["thermopoint"],
-                        opacity=0.95,
+                        opacity=0.9,
                     ),
                     text=hovers_o,
                     hovertemplate="%{text}<extra></extra>",
@@ -1411,7 +1503,7 @@ def build_plotly_map(
                     legendgroup="thermal-strong",
                     showlegend=False,
                     marker=dict(
-                        size=22,
+                        size=14,
                         color=THEME["blink_point"],
                         opacity=1.0,
                     ),
@@ -1429,7 +1521,7 @@ def build_plotly_map(
                 lon=[lon_min, lon_max, lon_max, lon_min, lon_min],
                 lat=[lat_min, lat_min, lat_max, lat_max, lat_min],
                 mode="lines",
-                line=dict(color=THEME["accent"], width=4),
+                line=dict(color=THEME["accent"], width=2),
                 name="Область запроса",
                 legendgroup="query-area",
                 showlegend=False,
@@ -1446,20 +1538,24 @@ def build_plotly_map(
 
     fig.update_layout(
         map=dict(
-            style="open-street-map",
+            style="carto-darkmatter" if dark_map else "open-street-map",
             center=dict(lat=center_lat, lon=center_lon),
             zoom=zoom,
         ),
         height=620,
         margin=dict(l=0, r=0, t=0, b=0),
-        paper_bgcolor="#0b1a2e",
-        plot_bgcolor="#0b1a2e",
+        paper_bgcolor=THEME["bg_panel"],
+        plot_bgcolor=THEME["bg_panel"],
         showlegend=False,
         hoverlabel=dict(
             align="left",
-            bgcolor="#081524",
-            bordercolor=THEME["accent"],
-            font=dict(color="#FFFFFF", size=12),
+            bgcolor=THEME["bg_panel"],
+            bordercolor=THEME["border_strong"],
+            font=dict(
+                family="IBM Plex Sans, Arial, sans-serif",
+                color=THEME["text"],
+                size=12,
+            ),
         ),
         dragmode="pan",
     )
@@ -1545,11 +1641,11 @@ def _parse_polygon_input(text: str) -> dict | None:
 
 
 def render_sidebar(manifest: dict, source: BaseDataSource) -> dict:
-    st.sidebar.markdown("# 🔎 Запрос")
+    st.sidebar.markdown("# Запрос")
     st.sidebar.caption("Параметры пространственно-временного поиска")
     st.sidebar.divider()
 
-    st.sidebar.markdown("### 🗄 Источник данных")
+    st.sidebar.markdown("### Источник данных")
 
     source_kind = str(manifest.get("source", "unknown"))
     source_label = SOURCE_LABELS.get(source_kind, source_kind)
@@ -1571,7 +1667,7 @@ def render_sidebar(manifest: dict, source: BaseDataSource) -> dict:
     date_min, date_max = _manifest_date_bounds(manifest)
 
     st.sidebar.divider()
-    st.sidebar.markdown("### 📍 Территория")
+    st.sidebar.markdown("### Территория")
 
     area_type = st.sidebar.radio(
         "Тип области",
@@ -1651,7 +1747,7 @@ def render_sidebar(manifest: dict, source: BaseDataSource) -> dict:
             st.sidebar.caption("Вставьте геометрию или переключитесь на bbox.")
 
     st.sidebar.divider()
-    st.sidebar.markdown("### 📅 Период")
+    st.sidebar.markdown("### Период")
 
     date_from = st.sidebar.date_input(
         "Дата начала",
@@ -1673,15 +1769,15 @@ def render_sidebar(manifest: dict, source: BaseDataSource) -> dict:
         st.sidebar.error("Дата начала позже даты окончания.")
 
     st.sidebar.divider()
-    st.sidebar.markdown("### 🗺 Отображение")
+    st.sidebar.markdown("### Отображение")
 
     show_thermopoints = st.sidebar.checkbox(
-        "🔥 Термоточки (AF)",
+        "Термоточки (AF)",
         value=True,
         key="q_show_thermal",
     )
     show_burns = st.sidebar.checkbox(
-        "▱ Контуры гарей (BS)",
+        "Контуры гарей (BS)",
         value=True,
         key="q_show_burns",
     )
@@ -1689,7 +1785,7 @@ def render_sidebar(manifest: dict, source: BaseDataSource) -> dict:
     st.sidebar.divider()
 
     execute = st.sidebar.button(
-        "🔍 Запросить",
+        "Запросить",
         type="primary",
         use_container_width=True,
         disabled=not (spatial_ok and temporal_ok),
@@ -1716,15 +1812,15 @@ def render_sidebar(manifest: dict, source: BaseDataSource) -> dict:
 
 def render_source_error(exc: ApiError) -> None:
     if exc.status_code == 0:
-        st.error(f"🔌 {exc.detail}")
+        st.error(exc.detail)
     elif exc.status_code == 400:
-        st.warning(f"⚠️ Невалидный запрос: {exc.detail}")
+        st.warning(f"Невалидный запрос: {exc.detail}")
     elif exc.status_code == 413:
-        st.warning("⚠️ Слишком большой запрос — сузьте bbox или период.")
+        st.warning("Слишком большой запрос — сузьте bbox или период.")
     elif exc.status_code == 422:
-        st.warning(f"⚠️ Ошибка валидации: {exc.detail}")
+        st.warning(f"Ошибка валидации: {exc.detail}")
     elif exc.status_code >= 500:
-        st.error(f"💥 Ошибка сервера ({exc.status_code}): {exc.detail}")
+        st.error(f"Ошибка сервера ({exc.status_code}): {exc.detail}")
     else:
         st.error(f"Ошибка {exc.status_code}: {exc.detail}")
 
@@ -1734,7 +1830,7 @@ def _severity_entry(by_severity: dict, level: int) -> dict:
 
 
 def render_analytics(summary: dict) -> None:
-    st.markdown("## 📊 Аналитическая справка")
+    st.markdown("## Аналитическая справка")
 
     n_thermopoints = summary.get("n_thermopoints", 0)
     n_burn_polygons = summary.get("n_burn_polygons", 0)
@@ -1766,8 +1862,6 @@ def render_analytics(summary: dict) -> None:
             </div>
         """)
 
-    render_html("<br>")
-
     st.markdown("### Распределение площади по степени поражения")
 
     by_severity = summary.get("by_severity") or {}
@@ -1784,16 +1878,22 @@ def render_analytics(summary: dict) -> None:
         count = int(data.get("count", 0) or 0)
         label = data.get("label") or SEVERITY_META[level]["name"]
         pct = (area / total_sev_area * 100) if total_sev_area > 0 else 0.0
+        color = SEVERITY_LEGEND_COLORS[level]
 
         with col:
             render_html(f"""
-                <div class="severity sev-{level}">
-                    <div class="severity-name">
-                        {SEVERITY_META[level]["emoji"]} {label}
+                <div class="severity">
+                    <div class="severity-head">
+                        <span class="swatch" style="background:{color};"></span>
+                        <span class="severity-name">{label}</span>
                     </div>
                     <div class="severity-area">{fmt_area(area)}</div>
-                    <div class="severity-percent">
-                        {pct:.1f}% площади · {fmt_int(count)} контуров
+                    <div class="severity-bar">
+                        <span style="width:{pct:.1f}%; background:{color};"></span>
+                    </div>
+                    <div class="severity-meta">
+                        <span>{pct:.1f}% площади</span>
+                        <span>{fmt_int(count)} контуров</span>
                     </div>
                 </div>
             """)
@@ -1822,7 +1922,7 @@ def render_analytics(summary: dict) -> None:
 
 
 def render_export(source: BaseDataSource, q: FireQuery) -> None:
-    st.markdown("## 📥 Выгрузка результатов")
+    st.markdown("## Выгрузка результатов")
 
     st.write(
         "Скачайте результаты запроса в машиночитаемом формате. "
@@ -1839,7 +1939,7 @@ def render_export(source: BaseDataSource, q: FireQuery) -> None:
     with col1:
         try:
             st.download_button(
-                "⬇ Термоточки (GeoJSON)",
+                "Термоточки (GeoJSON)",
                 data=source.export_thermopoints(q),
                 file_name=f"thermopoints_{suffix}.geojson",
                 mime="application/geo+json",
@@ -1853,7 +1953,7 @@ def render_export(source: BaseDataSource, q: FireQuery) -> None:
     with col2:
         try:
             st.download_button(
-                "⬇ Контуры гарей (GeoJSON)",
+                "Контуры гарей (GeoJSON)",
                 data=source.export_burns(q),
                 file_name=f"burns_{suffix}.geojson",
                 mime="application/geo+json",
@@ -1867,7 +1967,7 @@ def render_export(source: BaseDataSource, q: FireQuery) -> None:
     with col3:
         try:
             st.download_button(
-                "⬇ Справка (JSON)",
+                "Справка (JSON)",
                 data=source.export_summary(q),
                 file_name=f"summary_{suffix}.json",
                 mime="application/json",
@@ -1908,14 +2008,6 @@ def main():
     source_label = SOURCE_LABELS.get(source_kind, source_kind)
 
     badge_class = "badge-ok" if source.name != "Demo data" else "badge-warn"
-
-    render_html(f"""
-        <div class="badge-row">
-            <span class="badge {badge_class}">{source.name}</span>
-            <span class="badge">Модуль 1 — AF (VIIRS I1–I5)</span>
-            <span class="badge">Модуль 2 — BS (Sentinel-2 + Sentinel-1)</span>
-        </div>
-    """)
 
     if "last_response" not in st.session_state:
         st.session_state.last_response = None
@@ -1958,23 +2050,23 @@ def main():
                 hint = (
                     "Работает в демо-режиме на локальных данных. "
                     "Задайте область и период в боковой панели и нажмите "
-                    "<code>🔍 Запросить</code>."
+                    "<code>Запросить</code>."
                 )
             else:
                 hint = (
                     "Backend доступен. Задайте область и период в боковой "
-                    "панели и нажмите <code>🔍 Запросить</code>."
+                    "панели и нажмите <code>Запросить</code>."
                 )
 
             render_html(f"""
                 <div class="info-box">
-                    <b>Готов к работе</b><br>
+                    <div class="info-title">Готов к работе</div>
                     {hint}
                 </div>
             """)
         return
 
-    st.markdown("## 🛰 Результат запроса")
+    st.markdown("## Результат запроса")
 
     if last_query is not None:
         if last_query.polygon:
@@ -2005,19 +2097,29 @@ def main():
 
     render_html(f"""
         <div class="info-box">
-            <b>Параметры запроса</b><br>
-            📅 Период:
-                <code>{date_from_str}</code>
-                — <code>{date_to_str}</code><br>
-            📍 Территория: {area_desc}<br>
-            🗄 Источник: {last_source.name}<br>
-            🔥 Термоточек: <b>{fmt_int(n_thermal)}</b>
-            &nbsp;·&nbsp;
-            ▱ Контуров гарей: <b>{fmt_int(n_burns)}</b>
+            <div class="info-title">Параметры запроса</div>
+            <div class="kv">
+                <span class="k">Период</span>
+                <span class="v"><code>{date_from_str}</code> — <code>{date_to_str}</code></span>
+            </div>
+            <div class="kv">
+                <span class="k">Территория</span>
+                <span class="v">{area_desc}</span>
+            </div>
+            <div class="kv">
+                <span class="k">Источник</span>
+                <span class="v">{last_source.name}</span>
+            </div>
+            <div class="kv">
+                <span class="k">Термоточек</span>
+                <span class="v"><b>{fmt_int(n_thermal)}</b></span>
+            </div>
+            <div class="kv">
+                <span class="k">Контуров гарей</span>
+                <span class="v"><b>{fmt_int(n_burns)}</b></span>
+            </div>
         </div>
     """)
-
-    render_html("<br>")
 
     if n_thermal == 0 and n_burns == 0:
         st.info(
@@ -2025,7 +2127,7 @@ def main():
             "Попробуйте расширить период или увеличить bbox."
         )
 
-    st.markdown("## 🗺 Карта мониторинга")
+    st.markdown("## Карта мониторинга")
 
     map_fig, blink_index = build_plotly_map(
         thermopoints_fc=thermopoints_fc,
@@ -2043,62 +2145,50 @@ def main():
     )
 
     render_html(f"""
-        <div class="info-box">
-            <b>Легенда</b>
-            <div style="margin-top:10px;">
-                <div class="legend-row">
-                    <span class="legend-dot"
-                          style="background:{THEME['thermopoint']};"></span>
-                    <span>Термоточка — активное горение</span>
-                </div>
-                <div class="legend-row">
-                    <span class="legend-dot"
-                          style="background:{THEME['blink_point']};"></span>
-                    <span>Термоточка внутри контура сильной гари</span>
-                </div>
-                <div class="legend-row">
-                    <span class="legend-line"
-                          style="background:{SEVERITY_LEGEND_COLORS[1]};"></span>
-                    <span>Слабая степень поражения</span>
-                </div>
-                <div class="legend-row">
-                    <span class="legend-line"
-                          style="background:{SEVERITY_LEGEND_COLORS[2]};"></span>
-                    <span>Средняя степень поражения</span>
-                </div>
-                <div class="legend-row">
-                    <span class="legend-line"
-                          style="background:{SEVERITY_LEGEND_COLORS[3]};"></span>
-                    <span>Сильная степень поражения</span>
-                </div>
-                <div class="legend-row">
-                    <span class="legend-line"
-                          style="background:{THEME['accent']};"></span>
-                    <span>Граница области запроса (bbox)</span>
-                </div>
+        <div class="legend-grid">
+            <div class="legend-row">
+                <span class="legend-dot"
+                      style="background:{THEME['thermopoint']};"></span>
+                <span>Термоточка — активное горение</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-dot"
+                      style="background:{THEME['blink_point']};"></span>
+                <span>Термоточка внутри контура сильной гари</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-area"
+                      style="background:{SEVERITY_LEGEND_COLORS[1]};"></span>
+                <span>Слабая степень поражения</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-area"
+                      style="background:{SEVERITY_LEGEND_COLORS[2]};"></span>
+                <span>Средняя степень поражения</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-area"
+                      style="background:{SEVERITY_LEGEND_COLORS[3]};"></span>
+                <span>Сильная степень поражения</span>
+            </div>
+            <div class="legend-row">
+                <span class="legend-frame"></span>
+                <span>Граница области запроса (bbox)</span>
             </div>
         </div>
     """)
 
-    render_html("<br>")
-
     render_analytics(summary)
-
-    render_html("<br>")
 
     if last_query is not None:
         render_export(last_source, last_query)
 
     render_html(f"""
         <div class="footer-note">
-            Fire Monitor · прототип аналитического слоя
-            регионального мониторинга пожаров
-            <br>
-            Источник данных: {source_label}
-            &nbsp;·&nbsp;
-            Режим: <code>DATA_MODE={DATA_MODE}</code>
-            &nbsp;·&nbsp;
-            Сформировано: {datetime.now():%d.%m.%Y %H:%M}
+            <span>Fire Monitor: прототип аналитического слоя регионального мониторинга пожаров</span>
+            <span>Источник данных: {source_label}</span>
+            <span>Режим: <code>DATA_MODE={DATA_MODE}</code></span>
+            <span>Сформировано: {datetime.now():%d.%m.%Y %H:%M}</span>
         </div>
     """)
 
